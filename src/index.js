@@ -40,6 +40,17 @@ function monadic (fn, cache, serializer, arg) {
 
   return computedValue
 }
+async function asyncMonadic (fn, cache, serializer, arg) {
+  var cacheKey = isPrimitive(arg) ? arg : serializer(arg)
+
+  var computedValue = await cache.get(cacheKey)
+  if (typeof computedValue === 'undefined') {
+    computedValue = fn.constructor.name === 'AsyncFunction' ? await fn.call(this, arg) : fn.call(this, arg)
+    cache.set(cacheKey, computedValue)
+  }
+
+  return computedValue
+}
 
 function variadic (fn, cache, serializer) {
   var args = Array.prototype.slice.call(arguments, 3)
@@ -48,6 +59,18 @@ function variadic (fn, cache, serializer) {
   var computedValue = cache.get(cacheKey)
   if (typeof computedValue === 'undefined') {
     computedValue = fn.apply(this, args)
+    cache.set(cacheKey, computedValue)
+  }
+  return computedValue
+}
+
+async function asyncVariadic (fn, cache, serializer) {
+  var args = Array.prototype.slice.call(arguments, 3)
+  var cacheKey = serializer(args)
+
+  var computedValue = await cache.get(cacheKey)
+  if (typeof computedValue === 'undefined') {
+    computedValue = fn.constructor.name === 'AsyncFunction' ? await fn.apply(this, args) : fn.apply(this, args)
     cache.set(cacheKey, computedValue)
   }
 
@@ -64,37 +87,50 @@ function assemble (fn, context, strategy, cache, serialize) {
 }
 
 function strategyDefault (fn, options) {
-  var strategy = fn.length === 1 ? monadic : variadic
-
+var createdCache = options.cache.create()
+var isStorageAdapter = createdCache.opts && createdCache.opts.namespace // it's keyv | https://github.com/lukechilds/keyv
+var functions = {
+  monadic,
+  variadic,
+}
+if (isStorageAdapter || fn.constructor.name === 'AsyncFunction') functions = {
+  monadic: asyncMonadic,
+  variadic: asyncVariadic
+}
+var strategy = fn.length === 1 ? functions.monadic : functions.variadic
   return assemble(
     fn,
     this,
     strategy,
-    options.cache.create(),
+    createdCache,
     options.serializer
   )
 }
 
 function strategyVariadic (fn, options) {
-  var strategy = variadic
+  var createdCache = options.cache.create()
+  var isStorageAdapter = createdCache.opts && createdCache.opts.namespace
+  var strategy = (isStorageAdapter || fn.constructor.name === 'AsyncFunction') ? asyncVariadic : variadic
 
   return assemble(
     fn,
     this,
     strategy,
-    options.cache.create(),
+    createdCache,
     options.serializer
   )
 }
 
 function strategyMonadic (fn, options) {
-  var strategy = monadic
+var createdCache = options.cache.create()
+var isStorageAdapter = createdCache.opts && createdCache.opts.namespace
+  var strategy = (isStorageAdapter || fn.constructor.name === 'AsyncFunction') ? asyncMonadic : monadic
 
   return assemble(
     fn,
     this,
     strategy,
-    options.cache.create(),
+    createdCache,
     options.serializer
   )
 }
