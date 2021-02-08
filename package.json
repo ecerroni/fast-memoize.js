@@ -21,7 +21,8 @@
     "test": "jest",
     "test:all": "npm run lint && npm run test:typescript && npm run test",
     "test:coverage": "covert test/*.js",
-    "test:typescript": "cd ./typings/tests && npm install-test"
+    "test:typescript": "cd ./typings/tests && npm install-test",
+    "prepare": "npm run build"
   },
   "files": [
     "README.md",
