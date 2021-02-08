@@ -22,6 +22,23 @@ function memoize (fn, options) {
 }
 
 //
+// Helper
+//
+
+async function handleFunction(fn) { // the async conditional check [fn.constructor.name === 'AsyncFunction'] in the strategy
+// might not be enough as won't work with Babel/TypeScript output, because asyncFn is regular function in transpiled code, it is an instance of Function or GeneratorFunction, not AsyncFunction
+// Because of the above we perform this additional check here once the fn has been already called before setting the value in the cache
+// ref. https://stackoverflow.com/a/38510353/5546463
+// Limitation: at the moment this works reliably only with keyv as the storageAdapter
+  let promise = fn;
+    if (promise && typeof promise.then === 'function' && promise[Symbol.toStringTag] === 'Promise') {
+      // is compliant native promise implementation
+       promise = await fn
+       return promise
+    }
+    return fn
+}
+//
 // Strategy
 //
 
@@ -45,7 +62,7 @@ async function asyncMonadic (fn, cache, serializer, arg) {
 
   var computedValue = await cache.get(cacheKey)
   if (typeof computedValue === 'undefined') {
-    computedValue = fn.constructor.name === 'AsyncFunction' ? await fn.call(this, arg) : fn.call(this, arg)
+    computedValue = await handleFunction(fn.call(this, arg))
     cache.set(cacheKey, computedValue)
   }
 
@@ -70,7 +87,7 @@ async function asyncVariadic (fn, cache, serializer) {
 
   var computedValue = await cache.get(cacheKey)
   if (typeof computedValue === 'undefined') {
-    computedValue = fn.constructor.name === 'AsyncFunction' ? await fn.apply(this, args) : fn.apply(this, args)
+    computedValue = await handleFunction(fn.apply(this, args))
     cache.set(cacheKey, computedValue)
   }
 
