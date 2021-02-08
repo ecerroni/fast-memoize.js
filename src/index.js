@@ -15,9 +15,14 @@ function memoize (fn, options) {
     ? options.strategy
     : strategyDefault
 
+  this.debug = options && options.debug && typeof options.debug === 'boolean'
+    ? options.debug
+    : false
+    
   return strategy(fn, {
     cache: cache,
-    serializer: serializer
+    serializer: serializer,
+    debug
   })
 }
 
@@ -38,6 +43,7 @@ async function handleFunction(fn) { // the async conditional check [fn.construct
     }
     return fn
 }
+
 //
 // Strategy
 //
@@ -51,20 +57,22 @@ function monadic (fn, cache, serializer, arg) {
 
   var computedValue = cache.get(cacheKey)
   if (typeof computedValue === 'undefined') {
+    if (this.debug) console.log('[MEMO][CACHE][KEY] ', cacheKey, ' [MISS]')
     computedValue = fn.call(this, arg)
     cache.set(cacheKey, computedValue)
-  }
+  } else if (this.debug) console.log('[MEMO][CACHE][KEY] ', cacheKey, ' [HIT]')
 
   return computedValue
 }
 async function asyncMonadic (fn, cache, serializer, arg) {
   var cacheKey = isPrimitive(arg) ? arg : serializer(arg)
-
+  
   var computedValue = await cache.get(cacheKey)
   if (typeof computedValue === 'undefined') {
+    if (this.debug) console.log('[MEMO][CACHE][KEY] ', cacheKey, ' [MISS]')
     computedValue = await handleFunction(fn.call(this, arg))
     cache.set(cacheKey, computedValue)
-  }
+  } else if (this.debug) console.log('[MEMO][CACHE][KEY] ', cacheKey, ' [HIT]')
 
   return computedValue
 }
@@ -75,9 +83,10 @@ function variadic (fn, cache, serializer) {
 
   var computedValue = cache.get(cacheKey)
   if (typeof computedValue === 'undefined') {
+    if (this.debug) console.log('[MEMO][CACHE][KEY] ', cacheKey, ' [MISS]')
     computedValue = fn.apply(this, args)
     cache.set(cacheKey, computedValue)
-  }
+  } else if (this.debug) console.log('[MEMO][CACHE][KEY] ', cacheKey, ' [HIT]')
   return computedValue
 }
 
@@ -87,10 +96,10 @@ async function asyncVariadic (fn, cache, serializer) {
 
   var computedValue = await cache.get(cacheKey)
   if (typeof computedValue === 'undefined') {
+    if (this.debug) console.log('[MEMO][CACHE][KEY] ', cacheKey, ' [MISS]')
     computedValue = await handleFunction(fn.apply(this, args))
     cache.set(cacheKey, computedValue)
-  }
-
+  } else if (this.debug) console.log('[MEMO][CACHE][KEY] ', cacheKey, ' [HIT]')
   return computedValue
 }
 
